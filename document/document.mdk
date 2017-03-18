@@ -1,0 +1,75 @@
+Title         : CSAPP-Network Programing learning Notes
+Author        : Eddie
+Logo          : True
+
+[TITLE]
+# must known
+It is important to realize that clients and servers are processes and not machines, or hosts as they are often called in this context.
+
+
+* A single host can run many different clients and servers concurrently;
+* A client and a server transaction can be on the same or deifferent hosts.
+* **but the client and server model is the same.**
+
+
+
+
+# Network
+[To a host, a network is just another I/O device that serves as a source
+and sink for data, as shown in Figure 11.2. An adapter plugged into an
+expansion slot on the I/O bus provides the physical interface to the
+network. Data received from the network is copied from the adapter across
+the I/O and memory buses into memory, typically by a DMA transfer.
+Similarly, data can also be copied from memory to the network.]{ margin-left=2ex }
+
+
+# Ethernet adaptor
+[ Each Ethernet adapter has a globally unique 48-bit address that is stored in
+a non-volatile memory on the adapter. A host can send a chunk of bits called a
+frame to any other host on the segment. Each frame includes some fixed number
+of header bits that identify the source and destination of the frame and the frame
+length, followed by a payload of data bits. Every host adapter sees the frame, but
+only the destination host actually reads it.]{ margin-left=2ex }
+
+* The crucial property of an internet is that it can consist of _different_ LANs and WANs with radically different and incompatible technologies
+
+* Internet clients and servers communicate using a mix of sockets interface functions and Unix I/O functions.
+(We will describe the sockets interface in Section 11.4.) **The sockets functions are typically implemented as system calls that trap into the kernel and call various
+kernel-mode functions in TCP/IP.**
+
+## programer's persepective of Network
+* The set of hosts is mapped to a set of 32-bit IP addresses.
+* The set of IP addresses is mapped to a set of identifiers called Internet domain
+names.
+* A process on one Internet host can communicate with a process on any other Internet 
+host over a connection.
+
+
+
+# what is a socket
+[socket is an **end point** of a connection. Each socket has a corresponding
+socket address **that consists of an Internet address and a 16-bit integer port**, and
+is denoted by **address:port**. **_The port in the client’s socket address is assigned
+automatically by the kernel when the client makes a connection request_**, and is
+known as an ephemeral port. **However, the port in the server’s socket address is
+typically some well-known port that is associated with the service**. For example,
+_Web servers typically use port 80, and email servers use port 25. On Unix machines,
+the file /etc/services contains a comprehensive list of the services provided on
+that machine, along with their well-known ports.
+**A connection is uniquely identified by the socket addresses of its two end-
+points. This pair of socket addresses is known as a socket pair and is denoted by
+the tuple**.]{ margin-left=2ex }
+
+
+
+# what is the socket interface
+[The sockets interface is ***a set of functions that are used in conjunction with the Unix
+I/O functions*** to build network applications. It has been implemented on most
+modern systems, including all Unix variants, Windows, and Macintosh systems.]{ margin-left=2ex }
+
+
+
+# socket structure
+[From the perspective of the Unix kernel, a socket is an **end point for communi-
+cation**. From the perspective of a Unix program, a socket is an _**open file**_ with a
+corresponding descriptor.]{ margin-left=2ex }
