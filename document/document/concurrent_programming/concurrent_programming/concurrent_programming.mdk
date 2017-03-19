@@ -1,0 +1,533 @@
+Title         : CSAPP--concurrent Programming
+Author        : Eddie       2017/03/19
+Logo          : True
+
+[TITLE]
+
+# difinition of concurrency
+logical control flows are concurrent if they **_overlap in time_**.
+
+# why is concurrency useful
+
+* **_Accessing slow I/O devices_**. When an application is waiting for data to arrive
+from a slow I/O device such as a disk, the kernel keeps the CPU busy by
+running other processes. Individual applications can exploit concurrency in a
+similar way by overlapping useful work with I/O requests.
+* **_Interacting with humans_**.People who interact with computers demand the ability to perform multiple tasks at the same time. For example, they might want
+to resize a window while they are printing a document. Modern windowing
+systems use concurrency to provide this capability. Each time the user requests
+some action (say, by clicking the mouse), a separate concurrent logical flow is
+created to perform the action.
+* **_Reducing latency by deferring work_**. Sometimes, applications can use concurrency to reduce the latency of certain operations by deferring other operations
+and performing them concurrently. For example, a dynamic storage allocator
+might reduce the latency of individual free operations by deferring coalescing to a concurrent “coalescing” flow that runs at a lower priority, soaking up
+spare CPU cycles as they become available.
+* **_Servicing multiple network clients_**. The iterative network servers that we studied in Chapter 11 are unrealistic because they can only service one client at
+a time. Thus, a single slow client can deny service to every other client. For a
+real server that might be expected to service hundreds or thousands of clients
+per second, it is not acceptable to allow one slow client to deny service to the
+others. **A better approach is to build a concurrent server that creates a separate
+logical flow for each client**. This allows the server to service multiple clients
+concurrently, and precludes slow clients from monopolizing the server.
+* **_Computing in parallel on multi-core machines_**. Many modern systems are
+equipped with multi-core processors that contain multiple CPUs. Applications that are partitioned into concurrent flows often run faster on multi-core
+machines than on uniprocessor machines _because the flows execute in parallel
+rather than being interleaved_.
+
+
+
+# several approaches build concurrent programs
+* **_Process_**
+
+  With this approach, **each logical control flow is a process that is scheduled
+  and  maintained by the kernel**. Since processes have separate virtual
+  address spaces, flows that want to communicate with each other must use some
+  kind of explicit interprocess communication (**_IPC_**) mechanism.
+* **_I/O multiplexing_**.This is a form of concurrent programming where **applications
+explicitly schedule their own logical flows in the context of a single process**.
+Logical flows are modeled as state machines that the main program explicitly
+transitions from state to state as a result of data arriving on file descriptors.
+Since the program is a single process, all flows share the same address space.
+* **_Threads_**. **_Threads are logical flows that run in the context of a single process
+and are scheduled by the kernel_**. _You can think of threads as a hybrid of the
+other two approaches_, scheduled by the kernel like process flows, and sharing
+the same virtual address space like I/O multiplexing flows.
+
+# Concurrent programming with process
+## **pros & cons of process**
+### advantages
+
+Processes have a **clean model for sharing state information between parents and
+children: file tables are shared and user address spaces are not**.Having separate
+address spaces for processes is both an advantage and a disadvantage. It is impossible
+for one process to accidentally overwrite the virtual memory of another
+process, which eliminates a lot of confusing failures—an obvious advantage.
+### disadvantages
+* separate address spaces make it more **difficult for processes to share state information**.
+* To share information, they must use **explicit IPC** (interprocess communications) mechanisms
+* tend to be slower because the **overhead for process control and IPC is high**.
+
+### different IPC
+* **Unix Signals**
+* **Socket**
+* **Pipes**
+* **Message queue**
+* **FIFOs**
+* **System V Shared Memory**
+* **System V semaphores**
+
+# Concurrent programming with I/O multiplexing
+**_Suppose_** you are asked to write an echo server that can also respond to interactive
+commands that the user types to standard input. In this case, the server must
+respond to two independent I/O events: (1) a network client making a connection
+request, and (2) a user typing a command line at the keyboard. Which event do we
+wait for first? Neither option is ideal. If we are waiting for a connection request in
+accept, then we cannot respond to input commands. Similarly, if we are waiting
+for an input command in read, then we cannot respond to any connection requests.
+
+One solution to this dilemma is a technique called **I/O multiplexing**. The basic
+idea is to use the select function to ask the kernel to suspend the process, returning 
+control to the application **only after one or more I/O events have occurred**, as
+in the following examples:
+
+* return when any descriptor in the set{0,4}is ready for reading.
+* return when any descriptor in the set{1,2,7} is ready for writing.
+* timeout if 152.13 seconds have elsapsed waiting for an I/O event to occur. 
+
+Select is a complicated function with many different usage scenarios. We
+will only discuss the first scenario: waiting for a set of descriptors to be ready for
+reading.
+
+## Concurrent Event-driven server based on I/O multiplexing
+I/O multiplexing can be used as the basis for concurrent event-driven programs,
+where flows make progress as a result of certain events. The general idea is to
+model logical flows as state machines.
+
+## pros & cons
+* **pros**
+
+ 1. event-driven designs give programmers **_more control_** over the behavior of
+   their programs than process-based designs.For example, we can imagine writing
+    an event-driven concurrent server that gives preferred service to some clients,
+which would be difficult for a concurrent server based on processes.
+ 2.  event-driven server based on I/O multiplexing **runs in the context of a single 
+ process, and thus every logical flow has access to the entire address space** of the process. 
+ This makes it easy to share data between flows.
+ 3. you can debug your concurrent server as you would any sequential program, using a familiar
+debugging tool such as gdb, since it is a single process flow.
+ 4. vent-driven designs are often significantly more efficient than process-based designs 
+ because **_they do not require a process context switch to schedule a new flow_**.
+
+* **cons**
+ 1. A significant disadvantage of event-driven designs is **coding complexity**.Unfortunately, 
+ **the complexity increases as the granularity of the concurrency decreases**.
+  By granularity, we mean the number of instructions that each logical flow executes per 
+  time slice. For instance, in our example concurrent server, the granularity of concurrency is the number of instructions required
+to read an entire text line. As long as some logical flow is busy reading a text line,
+no other logical flow can make progress. This is fine for our example, but it makes
+our event-driver server vulnerable to a malicious client that sends only a partial
+text line and then halts. Modifying an event-driven server to handle partial text
+lines is a nontrivial task, but it is handled cleanly and automatically by a process-
+based design.
+ 2. **can not make full use of multi-core processor**.
+
+
+# Concurrent Programming with Threads
+
+**_thread can be described as a hybrid of process & I/O multiplexing_**,Each thread has 
+its **_own thread context_**,including:
+
+* **a unique integer thread ID** (TID)
+* **private stack**, stack pointer, program counter, general-purpose registers, and condition codes
+* All threads running in a process **share the entire virtual address space of that process**.
+
+Logical flows based on threads combine qualities of flows based on processes
+and I/O multiplexing. Like processes, threads are **scheduled automatically by the
+kernel and are known to the kernel by an integer ID**. Like flows based on I/O 
+multiplexing, multiple threads run in the context of a single process, and thus share
+the entire contents of the process **_virtual address space, including its code, data,
+heap, shared libraries, and open files_**.
+
+## Thread Execution Model
+The execution model for multiple threads is similar in some ways to the execution
+model for multiple processes. Consider the example in Figure 12.12. Each process
+begins life as a single thread called the main thread. At some point, the main thread
+creates a peer thread, and from this point in time the two threads run concurrently.
+Eventually, control passes to the peer thread via a context switch, because the
+main thread executes a slow system call such as read or sleep, or because it is
+interrupted by the system’s interval timer. The peer thread executes for a while
+before control passes back to the main thread, and so on.
+
+But there are several notable differences:
+
+* because a thread context is much smaller than a process context, a thread context switch is
+faster than a process context switch.
+* Another difference is that threads, unlike processes, are not organized in a rigid parent-child hierarchy. The threads associated
+with a process form a pool of peers, independent of which threads were created
+by which other threads.**_The main thread is distinguished from other threads only
+in the sense that it is always the first thread to run in the process_**. The main impact
+of this notion of a pool of peers is that **a thread can kill any of its peers, or wait
+for any of its peers to terminate. Further, each peer can read and write the same
+shared data**.
+
+## Posix Threads
+Posix threads (Pthreads) is a standard interface for manipulating threads from C
+programs. It was adopted in 1995 and is available on most Unix systems. **Pthreads
+defines about 60 functions that allow programs to _create, kill, and reap threads_,
+to _share data_ safely with peer threads, and to _notify peers about changes_ in the
+system state**.
+
+
+**_a simple thread program_**
+``` javascript
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+//#include "csapp.h"
+void *thread(void *vargp);
+
+int main()
+{
+    //printf("Hello world!\n");
+    pthread_t tid;
+    pthread_create(&tid,NULL,thread,NULL);
+    pthread_join(tid,NULL);
+    exit(0);
+    //return 0;
+}
+
+void *thread(void *vargp) /**< thread routine */
+{
+    printf("hello,world!\n");
+    return NULL;
+}
+
+```
+The above code shows a simple Pthreads program. The main thread creates a
+peer thread and then waits for it to terminate. The peer thread prints “Hello,
+world!\n” and terminates. When the main thread detects that the peer thread
+has terminated, it terminates the process by calling exit.
+
+This is the first threaded program we have seen, so let us dissect it carefully.
+The code and local data for a thread is encapsulated in a thread routine. As shown
+by the prototype in line 2, **each thread routine takes as input a single generic
+pointer and returns a generic pointer**. __If you want to pass multiple arguments to
+a thread routine, then you should put the arguments into a structure and pass a
+pointer to the structure__. Similarly, if you want the thread routine to return multiple
+arguments, you can return a pointer to a structure.
+
+Line 4 marks the beginning of the code for the main thread. The main thread
+declares a single local variable tid, which will be used to store the thread ID of
+the peer thread (line 6). **The main thread creates a new peer thread by calling the
+_pthread_create_ function** (line 7). **When the call to pthread_create returns, the
+main thread and the newly created peer thread are running concurrently**, and tid
+contains the ID of the new thread. **The main thread waits for the peer thread
+to terminate with the call to _pthread\_join_** in line 8. Finally, **the main thread
+calls exit (line 9), which terminates all threads** (in this case just the main thread)
+currently running in the process.
+
+
+
+### Creating Threads
+Threads create other threads by calling the pthread_create function.
+``` javascript
+#include <pthread.h>
+typedef void *(func)(void *);
+int pthread_create(pthread_t *tid, pthread_attr_t *attr,func *f, void *arg);
+                                            // Returns: 0 if OK, nonzero on error
+pthread_t pthread_self(void);
+                 //Returns: thread ID of caller
+                                            
+```
+The pthread_create function creates a new thread and runs the thread rou-
+tine f in the context of the new thread and with an input argument of arg. The
+attr argument can be used to change the default attributes of the newly created
+thread. Changing these attributes is beyond our scope, and in our examples, we
+will always call pthread_create with a NULL attr argument.
+When pthread_create returns, argument tid contains the ID of the newly
+created thread. The new thread can determine its own thread ID by calling the
+pthread_self function.
+
+
+### Terminating Threads
+A thread terminates in one of the following ways:
+``` javascript
+#include <pthread.h>
+void pthread_exit(void *thread_return);
+         //Returns: 0 if OK, nonzero on error"world";
+
+int pthread_cancel(pthread_t tid);
+        //Returns: 0 if OK, nonzero on error
+```
+
+* The thread terminates implicitly when its **top-level thread routine returns**.
+* The thread terminates explicitly by _calling the pthread\_exit function_. **If
+the main thread calls pthread_exit, it waits for all other peer threads to
+terminate, and then terminates the main thread and the entire process with a
+return value of thread_return**.
+* Some peer thread **calls the Unix exit function**, which **terminates the process
+and all threads associated with the process**.
+* Another peer thread terminates the current thread by **calling the pthread_
+cancel** function with the ID of the current thread.
+
+### Reaping Terminated Threads
+Threads wait for other threads to terminate by calling the pthread_join function.
+``` javascript
+#include <pthread.h>
+int pthread_join(pthread_t tid, void **thread_return);
+               //Returns: 0 if OK, nonzero on error
+```
+The pthread_join function **blocks until thread tid terminates, assigns the
+generic (void *) pointer returned by the thread routine to the location pointed to
+by thread_return**, and then _reaps any memory resources held by the terminated
+thread_.
+
+Notice that, unlike the Unix wait function, the **pthread_join function can
+only wait for a specific thread to terminate**. **There is no way to instruct pthread_
+wait to wait for an arbitrary thread to terminate**. This can complicate our code by
+forcing us to use other, less intuitive mechanisms to detect process termination.
+
+### Detaching Threads
+At any point in time, a thread is **_joinable or detached_**. **A joinable thread can be
+reaped and killed by other threads. Its memory resources (such as the stack) are
+not freed until it is reaped by another thread. In contrast, a detached thread cannot
+be reaped or killed by other threads. Its memory resources are freed automatically
+by the system when it terminates**.
+``` javascript
+#include <pthread.h>
+int pthread_detach(pthread_t tid);
+               //Returns: 0 if OK, nonzero on error
+```
+
+The pthread_detach function detaches the joinable thread tid. **Threads can
+detach themselves by calling pthread_detach with an argument of pthread_
+self()**.
+
+Although some of our examples will use joinable threads, there are good rea-
+sons to use detached threads in real programs. For example, a high-performance
+Web server might create a new peer thread each time it receives a connection re-
+quest from a Web browser. Since each connection is handled independently by a
+separate thread, it is unnecessary—and indeed undesirable—for the server to ex-
+plicitly wait for each peer thread to terminate. In this case, each peer thread should
+detach itself before it begins processing the request so that its memory resources
+can be reclaimed after it terminates.
+
+
+### Initializing Threads
+The pthread_once function allows you to initialize the state associated with a
+thread routine.
+``` javascript
+#include <pthread.h>
+pthread_once_t once_control = PTHREAD_ONCE_INIT;
+int pthread_once(pthread_once_t *once_control, void (*init_routine)(void));
+                                              //Always returns 0
+```
+The once_control variable is a global or static variable that is always initial-
+ized to PTHREAD_ONCE_INIT. The first time you call pthread_once with an
+argument of once_control, it invokes init_routine, which is a function with
+no input arguments that returns nothing. Subsequent calls to pthread_once with
+the same once_control variable do nothing. **The pthread_once function is useful
+whenever you need to dynamically initialize global variables that are shared by
+multiple threads**.
+
+
+### DEMO: A Concurrent Server Based on Threads
+The following code shows a concurrent echo server based on threads. 
+``` javascript
+#include "csapp.h"
+void echo(int connfd);
+void *thread(void *vargp);
+int main(int argc, char **argv)
+{
+    int listenfd, *connfdp, port;
+    socklen_t clientlen=sizeof(struct sockaddr_in);
+    struct sockaddr_in clientaddr;
+    pthread_t tid;
+    if (argc != 2 )
+    {
+        fprintf(stderr, "usage: %s <port>\n", argv[]);
+        exit();
+    }
+    port = atoi(argv[]);
+
+    listenfd = Open_listenfd(port);
+    while ()
+    {
+        connfdp = Malloc(sizeof(int));
+        *connfdp = Accept(listenfd, (SA *) &clientaddr, &clientlen);
+        Pthread_create(&tid, NULL, thread, connfdp);
+    }
+
+}
+
+/* Thread routine */
+void *thread(void *vargp)
+{
+    int connfd = *((int *)vargp);
+    Pthread_detach(pthread_self());
+    Free(vargp);
+    echo(connfd);
+    Close(connfd);
+    return NULL;
+}
+```
+~ Center
+_Concurrent echo server based on threads_
+~
+
+The overall structure is similar to the process-based design. **The main thread repeat-
+edly waits for a connection request and then creates a peer thread to handle the
+request**. While the code looks simple, there are a couple of general and somewhat
+subtle issues we need to look at more closely. The first issue is how to pass the con-
+nected descriptor to the peer thread when we call pthread_create. The obvious
+approach is to pass a pointer to the descriptor, as in the following:
+~ Center
+_connfd = Accept(listenfd, (SA *) &clientaddr, &clientlen)_;
+
+_Pthread\_create(&tid, NULL, thread, &connfd)_;
+~
+Then we have the peer thread dereference the pointer and assign it to a local
+variable, as follows:
+``` javascript
+void *thread(void *vargp) {
+int connfd = *((int *)vargp);
+.
+.
+.
+}
+```
+This would be wrong, however, **because it introduces a race between the assignment 
+statement in the peer thread and the accept statement in the main
+thread**. If the assignment statement completes before the next accept, then the local 
+connfd variable in the peer thread gets the correct descriptor value. However,
+if the assignment completes after the accept, then the local connfd variable in the
+peer thread gets the descriptor number of the next connection. The unhappy result
+is that two threads are now performing input and output on the same descriptor.
+In order to avoid the potentially deadly race, we must assign each connected descriptor 
+returned by accept to its own dynamically allocated memory block, as
+shown in lines 21–22. We will return to the issue of races in Section 12.7.4.
+
+**Another issue is avoiding memory leaks in the thread routine**. Since we are
+not explicitly reaping threads, we must detach each thread so that its memory
+resources will be reclaimed when it terminates (line 31). Further, we must be
+careful to free the memory block that was allocated by the main thread (line 32).
+
+## Shared Variables in Threaded Programs
+From a programmer’s perspective, one of the attractive aspects of threads is the
+ease with which multiple threads can share the same program variables. However,
+this sharing can be tricky. In order to write correctly threaded programs, we must
+have a clear understanding of what we mean by sharing and how it works.
+
+There are some basic questions to work through in order to understand
+whether a variable in a C program is shared or not: 
+
+ 1. What is the underlying memory model for threads? 
+ 2. Given this model, how are instances of the variable mapped to memory? 
+ 3. Finally, how many threads reference each of these instances? 
+
+**The variable is shared if and only if multiple threads reference some
+instance of the variable**.
+
+To keep our discussion of sharing concrete, we will use the program in Fig-
+ure 12.15 as a running example. Although somewhat contrived, it is nonetheless
+useful to study because it illustrates a number of subtle points about sharing. The
+example program consists of a main thread that creates two peer threads. The 
+main thread passes a unique ID to each peer thread, which uses the ID to print
+a personalized message, along with a count of the total number of times that the
+thread routine has been invoked.
+``` javascript
+#include "csapp.h"
+#define N 2
+void *thread(void *vargp);
+
+char **ptr;
+/* Global variable */
+int main()
+{
+   int i;
+   pthread_t tid;
+   char *msgs[N] = {"Hello from foo","Hello from bar"};
+
+  ptr = msgs;
+for (i = 0; i < N; i++)
+  Pthread_create(&tid, NULL, thread, (void *)i);
+  Pthread_exit(NULL);
+}
+/* thread routine */
+void *thread(void *vargp)
+{
+  int myid = (int)vargp;
+  static int cnt = 0;
+  printf("[%d]: %s (cnt=%d)\n", myid, ptr[myid], ++cnt);
+  return NULL;
+}
+```
+
+### Threads Memory Model
+A pool of concurrent threads runs in the context of a process. Each thread has
+its own separate thread context, which includes a thread ID, stack, stack pointer,
+program counter, condition codes, and general-purpose register values. Each
+thread shares the rest of the process context with the other threads. This includes
+the entire user virtual address space, which consists of read-only text (code),
+read/write data, the heap, and any shared library code and data areas. The threads
+also share the same set of open files.
+
+In an operational sense, it is impossible for one thread to read or write the
+register values of another thread. On the other hand, any thread can access any
+location in the shared virtual memory. If some thread modifies a memory location,
+then every other thread will eventually see the change if it reads that location.
+Thus, registers are never shared, whereas virtual memory is always shared.
+
+The memory model for the separate thread stacks is not as clean. These
+stacks are contained in the stack area of the virtual address space, and are usually
+accessed independently by their respective threads. We say usually rather than
+always, because different thread stacks are not protected from other threads. So
+if a thread somehow manages to acquire a pointer to another thread’s stack, then
+it can read and write any part of that stack. Our example program shows this in
+line 26, where the peer threads reference the contents of the main thread’s stack
+indirectly through the global ptr variable.
+
+### Mapping Variables to Memory
+Variables in threaded C programs are mapped to virtual memory according to
+their storage classes:
+
+* **_Global variables_**. A global variable is any variable declared outside of a func-
+tion. At run time, the read/write area of virtual memory contains exactly one
+instance of each global variable that can be referenced by any thread. For ex-
+ample, the global ptr variable declared in line 5 has one run-time instance in
+the read/write area of virtual memory. When there is only one instance of a
+variable, we will denote the instance by simply using the variable name—in
+this case, ptr.
+* **_Local automatic variables_**. A local automatic variable is one that is declared
+inside a function without the static attribute. At run time, each thread’s
+stack contains its own instances of any local automatic variables. This is true
+even if multiple threads execute the same thread routine. For example, there
+is one instance of the local variable tid, and it resides on the stack of the main
+thread. We will denote this instance as tid.m. As another example, there are
+two instances of the local variable myid, one instance on the stack of peer
+thread 0, and the other on the stack of peer thread 1. We will denote these
+instances as myid.p0 and myid.p1, respectively.
+* **_Local static variables_**. A local static variable is one that is declared inside a
+function with the static attribute. As with global variables, the read/write
+area of virtual memory contains exactly one instance of each local static
+variable declared in a program. For example, even though each peer thread
+in our example program declares cnt in line 25, at run time there is only one
+instance of cnt residing in the read/write area of virtual memory. Each peer
+thread reads and writes this instance.
+
+### Shared Variables
+**_We say that a variable v is shared if and only if one of its instances is referenced
+by more than one thread_**. For example, variable cnt in our example program is shared 
+because it has only one run-time instance and this instance is referenced by
+both peer threads. On the other hand, myid is not shared because each of its two
+instances is referenced by exactly one thread. However, it is important to realize
+that local automatic variables such as msgs can also be shared.
+
+## Synchronizing Threads with Semaphores
+Shared variables can be convenient, but they introduce the possibility of nasty
+synchronization errors. Consider the badcnt.c program in Figure 12.16, which
+creates two threads, each of which increments a global shared counter variable
+called cnt. Since each thread increments the counter niters times, we expect its
+final value to be 2 × niters. This seems quite simple and straightforward. However,
+when we run badcnt.c on our Linux system, we not only get wrong answers, we
+get different answers each time!
