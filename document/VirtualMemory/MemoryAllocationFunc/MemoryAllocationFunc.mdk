@@ -1,0 +1,187 @@
+Title         : Dynamic Memory Allocation & Functions
+Author        : Eddie 2017/3/21
+Logo          : True
+
+[TITLE]
+
+While it is certainly possible to use the low-level mmap and munmap functions to
+create and delete areas of virtual memory, C programmers typically find it more
+**convenient and more portable** to use a **dynamic memory allocator** when they need
+to acquire additional virtual memory at run time.
+
+![2017-03-21 21:15:39屏幕截图]
+
+[2017-03-21 21:15:39屏幕截图]: images/2017-03-21-21-15-39-.png "2017-03-21 21:15:39屏幕截图" { width:auto; max-width:90% }
+
+A dynamic memory allocator maintains an area of a process’s virtual memory
+known as the heap (Figure 9.33). Details vary from system to system, but without
+loss of generality, we will assume that **the heap is an area of demand-zero mem-
+ory that begins immediately after the uninitialized bss area and grows upward
+(toward higher addresses)**. **For each process, the kernel maintains a variable _brk_
+(pronounced “break”) that points to the top of the heap**.
+
+**An allocator maintains the heap as a collection of various-sized blocks. Each
+block is a contiguous chunk of virtual memory that is either allocated or free**. An
+allocated block has been explicitly reserved for use by the application. A free block
+is available to be allocated. **A free block remains free until it is explicitly allocated
+by the application**. **An allocated block remains allocated until it is freed, either
+explicitly by the application, or implicitly by the memory allocator itself**.
+
+Allocators come in two basic styles. Both styles **require the application to
+explicitly allocate blocks**. **_They differ about which entity is responsible for freeing
+allocated blocks_**.
+
+* **_Explicit allocators_** require the application to explicitly free any allocated
+blocks. For example, the C standard library provides an explicit allocator
+called the malloc package. C programs allocate a block by calling the malloc
+function, and free a block by calling the free function. The new and delete
+calls in C++ are comparable.
+* **Implicit allocators**, on the other hand, **require the allocator to detect when
+an allocated block is no longer being used by the program and then free
+the block**. Implicit allocators are also known as garbage collectors, and the
+process of automatically freeing unused allocated blocks is known as garbage
+collection. For example, higher-level languages such as **Lisp, ML, and Java** rely
+on garbage collection to free allocated blocks.
+
+
+The remainder of this section discusses the design and implementation of
+explicit allocators. We will discuss implicit allocators in Section 9.10. For concrete-
+ness, our discussion focuses on allocators that manage heap memory. However,
+**you should be aware that memory allocation is a general idea that arises in a vari-
+ety of contexts**. **For example, applications that do intensive manipulation of graphs
+will often use the standard allocator to acquire a large block of virtual memory,
+and then use an application-specific allocator to manage the memory within that
+block as the nodes of the graph are created and destroyed**.
+
+# The _malloc_ and _free_ Functions
+The C standard library provides an explicit allocator known as the malloc package.
+Programs allocate blocks from the heap by calling the malloc function.
+
+``` javascript
+      #include <stdlib.h>
+        void *malloc(size_t size);
+                   //Returns: ptr to allocated block if OK, NULL on error
+          
+          
+/*function allocates memory for an array of nmemb elements of size bytes
+ each and returns a pointer to the allocated memory.The memory  is  set
+to zero.  If nmemb or size is 0, then calloc() returns either NULL, 
+or a unique pointer value that can later  be  successfully passed to free().*/
+       void *calloc(size_t nmemb, size_t size);
+
+      /*The  realloc() function changes the size of the memory block pointed to
+       by ptr to size bytes.  The contents will be unchanged in the range from
+       the start of the region up to the minimum of the old and new sizes.  If
+       the new size is larger than the old size, the added memory will not  be
+       initialized.   If  ptr  is  NULL,  then  the call is equivalent to mal‐
+       loc(size), for all values of size; if size is equal to zero, and ptr is
+       not  NULL,  then  the  call  is equivalent to free(ptr).  Unless ptr is
+       NULL, it must have been returned by an earlier call to  malloc(),  cal‐
+       loc()  or  realloc().  If the area pointed to was moved, a free(ptr) is
+       done.*/
+
+       void *realloc(void *ptr, size_t size);
+
+```
+The malloc function returns a pointer to a block of memory of at least size bytes
+that is suitably aligned for any kind of data object that might be contained in the
+block. On the Unix systems that we are familiar with, malloc returns a block that
+is aligned to an 8-byte (double word) boundary.
+
+If malloc encounters a problem (e.g., the program requests a block of memory
+that is larger than the available virtual memory), then **it returns NULL and sets
+errno**. **Malloc does not initialize the memory it returns. Applications that want
+initialized dynamic memory can use calloc, a thin wrapper around the malloc
+function that initializes the allocated memory to zero**. Applications that want to
+change the size of a previously allocated block can use the realloc function.
+
+Dynamic memory allocators such as malloc can allocate or deallocate heap
+memory explicitly by using the mmap and munmap functions, or they can use the
+sbrk function:
+
+``` javascript
+#include <unistd.h>
+void *sbrk(intptr_t incr);
+        //Returns: old brk pointer on success, −1 on error
+```
+The **sbrk function grows or shrinks the heap by adding incr to the kernel’s brk
+pointer**. If successful, it returns the old value of brk, otherwise it returns −1 and
+sets errno to ENOMEM. If incr is zero, then sbrk returns the current value of
+brk. **Calling sbrk with a negative incr is legal but tricky because the return value
+(the old value of brk) points to abs(incr) bytes past the new top of the heap**.
+Programs free allocated heap blocks by calling the free function.
+
+The **ptr argument must point to the beginning of an allocated block that was
+obtained from malloc, calloc, or realloc**. **If not, then the behavior of free
+is undefined**. **Even worse, since it returns nothing, free gives no indication to
+the application that something is wrong. As we shall see in Section 9.11, this can
+produce some baffling run-time errors**.
+
+# why Dynamic Memory Allocation?
+
+* The most important reason that programs use dynamic memory allocation is that
+often they **do not know the sizes of certain data structures until the program
+actually runs**.
+
+# Allocator Requirements & Goals
+Explicit allocators must operate within some rather stringent constraints.
+
+* **Handling arbitrary request sequences**. An application can make an arbitrary
+sequence of allocate and free requests, subject to the constraint that each
+free request must correspond to a currently allocated block obtained from
+a previous allocate request. Thus, the allocator cannot make any assumptions
+about the ordering of allocate and free requests. For example, the allocator
+cannot assume that all allocate requests are accompanied by a matching free
+request, or that matching allocate and free requests are nested.
+
+* **Making immediate responses to requests**. The allocator must respond imme-
+diately to allocate requests. Thus, the allocator is not allowed to reorder or
+buffer requests in order to improve performance.
+
+* **Using only the heap**. In order for the allocator to be scalable, **any non-scalar
+data structures used by the allocator must be stored in the heap itself**.
+
+* **Aligning blocks (alignment requirement)**.The allocator must align blocks in
+such a way that they can hold any type of data object. On most systems, this
+means that the block returned by the allocator is aligned on an 8-byte (double-
+word) boundary.
+
+* **Not modifying allocated blocks**.Allocators can only manipulate or change free
+blocks. In particular, they are not allowed to modify or move blocks once they
+are allocated. Thus, techniques such as compaction of allocated blocks are not
+permitted.
+
+Working within these constraints, the author of an allocator attempts to meet
+the often conflicting performance goals of maximizing throughput and memory
+utilization.
+
+* **Maximizing throughput**.Given some sequence of n allocate and free
+requests
+~ Center
+R~0~ , R~1~ ,...R~k~ ,....R~n~
+~
+we would like to maximize an allocator’s throughput, which is defined as the
+number of requests that it completes per unit time. For example, if an allo-
+cator completes 500 allocate requests and 500 free requests in 1 second, then
+its throughput is 1,000 operations per second. In general, we can maximize
+throughput by minimizing the average time to satisfy allocate and free re-
+quests. As we’ll see, it is not too difficult to develop allocators with reasonably
+good performance where the worst-case running time of an allocate request
+is linear in the number of free blocks and the running time of a free request
+is constant.
+* **Maximizing memory utilization**.Naive programmers often incorrectly
+assume that virtual memory is an unlimited resource. **In fact, the total amount
+of virtual memory allocated by all of the processes in a system is limited by the
+amount of swap space on disk**. Good programmers know that virtual memory
+is a finite resource that must be used efficiently. This is especially true for
+a dynamic memory allocator that might be asked to allocate and free large
+blocks of memory.
+
+The objective of the allocator then is to maximize the peak utilization U~n−1~
+over the entire sequence. As we will see, there is a tension between maximiz-
+ing throughput and utilization. In particular, it is easy to write an allocator
+that maximizes throughput at the expense of heap utilization. **One of the in-
+teresting challenges in any allocator design is finding an appropriate balance
+between the two goals**.
+
+
