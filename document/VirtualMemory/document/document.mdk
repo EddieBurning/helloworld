@@ -1,0 +1,241 @@
+Title         : CSAPP-Common Memory-Related Bugs in C programs
+Author        : Eddie
+Logo          : True
+
+[TITLE]
+
+Managing and using virtual memory can be a difficult and error-prone task for C
+programmers. Memory-related bugs are among the most frightening because they
+often manifest themselves at a distance, in both time and space, from the source of
+the bug. Write the wrong data to the wrong location, and your program can run for
+hours before it finally fails in some distant part of the program. We conclude our
+discussion of virtual memory with a discussion of some of the common memory-
+related bugs.
+
+# Dereferencing Bad Pointers
+
+As we learned in Section 9.7.2, there are large holes in the virtual address space of a
+process that are not mapped to any meaningful data. **If we attempt to dereference
+a pointer into one of these holes, the operating system will terminate our program
+with a segmentation exception**. _**Also, some areas of virtual memory are read-only.
+Attempting to write to one of these areas terminates the program with a protection
+exception**_.
+A common example of dereferencing a bad pointer is the classic scanf bug.
+Suppose we want to use scanf to read an integer from stdin into a variable.
+The correct way to do this is to pass scanf a format string and the address of the
+variable:
+
+``` javascript
+scanf("%d",&val);
+```
+
+However, it is easy for new C programmers (and experienced ones too!) to pass
+the contents of val instead of its address:
+``` javascript
+scanf("%d",val);
+```
+In this case, scanf will interpret the contents of val as an address and attempt to
+write a word to that location. **In the best case, the program terminates immediately
+with an exception. In the worst case, the contents of val correspond to some
+valid read/write area of virtual memory, and we overwrite memory, usually with
+disastrous and baffling consequences much later**.
+
+
+
+# Reading Uninitialized Memory
+While bss memory locations (such as uninitialized global C variables) are always
+initialized to zeros by the loader, this is not true for heap memory. A common
+error is to assume that heap memory is initialized to zero:
+``` javascript
+/* Return y = Ax */
+int *matvec(int **A, int *x, int n)
+{
+   int i, j;
+   int *y = (int *)Malloc(n * sizeof(int));
+   for (i = 0; i < n; i++)
+      for (j = 0; j < n; j++)
+         y[i] += A[i][j] * x[j];
+   return y;
+}
+```
+
+**In this example, the programmer has incorrectly assumed that vector y has been
+initialized to zero. A correct implementation would explicitly zero y[i], or use
+calloc**.
+
+# Allowing Stack Buffer Overflows
+
+**As we saw in Section 3.12, a program has a buffer overflow bug if it writes to a target
+buffer on the stack without examining the size of the input string**. For example,
+the following function has a buffer overflow bug because the gets function copies
+an arbitrary length string to the buffer. To fix this, we would need to use the fgets
+function, which limits the size of the input string.
+``` javascript
+void bufoverflow()
+{
+  char buf[64];
+  gets(buf); /* Here is the stack buffer overflow bug */
+  return;
+}
+```
+
+# Assuming that pointers and the Objects They Point to Are the Same Size
+
+One common mistake is to assume that pointers to objects are the same size as
+the objects they point to:
+``` javascript
+/* Create an nxm array */
+int **makeArray1(int n, int m)
+{
+   int i;
+   int **A = (int **)Malloc(n * sizeof(int));
+   for (i = 0; i < n; i++)
+      A[i] = (int *)Malloc(m * sizeof(int));
+   return A;
+}
+```
+The intent here is to create an array of n pointers, each of which points to an array
+of m ints. However, because the programmer has written sizeof(int) instead
+of sizeof(int *) in line 5, the code actually creates an array of ints.
+
+This code will run fine on machines where ints and pointers to ints are the
+same size. But if we run this code on a machine like the Core i7, where a pointer is
+arger than an int, then the loop in lines 7–8 will write past the end of the A array.
+Since one of these words will likely be the boundary tag footer of the allocated
+block, we may not discover the error until we free the block much later in the
+program, at which point the coalescing code in the allocator will fail dramatically
+and for no apparent reason. This is an insidious **example of the kind of “action at
+a distance” that is so typical of memory-related programming bugs**.
+
+# Making Off-by-One Errors
+Off-by-one errors are another common source of overwriting bugs:
+``` javascript
+int **makeArray2(int n, int m)
+{
+   int i;
+   int **A = (int **)Malloc(n * sizeof(int *));
+   for (i = 0; i <= n; i++)
+       A[i] = (int *)Malloc(m * sizeof(int));
+   return A;
+}
+```
+
+This is another version of the program in the previous section. Here we have
+created an n-element array of pointers in line 5, but then tried to initialize n + 1 of
+its elements in lines 7 and 8, in the process overwriting some memory that follows
+the A array.
+
+
+# Referencing a Pointer Instead of the Object It Points to
+
+If we are not **careful about the precedence and associativity of C operators, then
+we incorrectly manipulate a pointer instead of the object it points to**. For example,
+consider the following function, whose purpose is to remove the first item in a
+binary heap of *size items, and then reheapify the remaining *size - 1 items:
+
+``` javascript
+int *binheapDelete(int **binheap, int *size)
+{
+    int *packet = binheap[0];
+
+    binheap[0] = binheap[*size - 1];
+    *size--; /* This should be (*size)-- */
+    heapify(binheap, *size, 0);
+    return(packet);
+}
+```
+In line 6, the intent is to decrement the integer value pointed to by the size pointer.
+However, because the unary -- and * operators have the same precedence and
+associate from right to left, the code in line 6 actually decrements the pointer
+itself instead of the integer value that it points to. If we are lucky, the program will
+crash immediately; but more likely we will be left scratching our heads when the
+program produces an incorrect answer much later in its execution. **The moral here
+is to use parentheses whenever in doubt about precedence and associativity**. For
+example, in line 6 we should have clearly stated our intent by using the expression
+(*size)--.
+
+# Misunderstanding the Pointer Arithmetic
+Another common mistake is to forget that **arithmetic operations on pointers are
+performed in units that are the size of the objects they point to, which are not
+necessarily bytes**. For example, the intent of the following function is to scan an
+array of ints and return a pointer to the first occurrence of val:
+
+``` javascript
+int *search(int *p, int val)
+{
+   while (*p && *p != val)
+      p += sizeof(int); /* Should be p++ */
+   return p;
+}
+```
+However, because line 4 increments the pointer by 4 (the number of bytes in an
+integer) each time through the loop, the function incorrectly scans every fourth
+integer in the array.
+
+
+# Referencing Nonexistent Variables
+Naive C programmers who do not understand the stack discipline will sometimes
+reference local variables that are no longer valid, as in the following example:
+``` javascript
+int *stackref ()
+{
+  int val;
+  return &val;
+}
+```
+This function returns a pointer (say, p) to a local variable on the stack and then
+pops its stack frame. **Although p still points to a valid memory address, it no longer
+points to a valid variable**. **When other functions are called later in the program, the
+memory will be reused for their stack frames. Later, if the program assigns some
+value to *p, then it might actually be modifying an entry in another function’s
+stack frame, with potentially disastrous and baffling consequences**.
+
+# Referencing Data in Free Heap Blocks
+
+A similar error is to reference data in heap blocks that have already been freed.
+For example, consider the following example, which allocates an integer array x in
+line 6, prematurely frees block x in line 10, and then later references it in line 14:
+``` javascript
+int *heapref(int n, int m)
+{
+   int i;
+   int *x, *y;
+   x = (int *)Malloc(n * sizeof(int));
+
+/* ... */ /* Other calls to malloc and free go here */
+  free(x);
+  y = (int *)Malloc(m * sizeof(int));
+  for (i = 0; i < m; i++)
+     y[i] = x[i]++; /* Oops! x[i] is a word in a free block */
+
+  return y;
+}
+```
+Depending on the pattern of malloc and free calls that occur between lines 6
+and 10, when the program references x[i] in line 14, the array x might be part
+of some other allocated heap block and have been overwritten. As with many
+memory-related bugs, the error will only become evident later in the program
+when we notice that the values in y are corrupted.
+
+
+
+# Introducing Memory Leak
+
+**Memory leaks are slow, silent killers that occur when programmers inadvertently
+create garbage in the heap by forgetting to free allocated blocks**. For example, the
+following function allocates a heap block x and then returns without freeing it:
+
+``` javascript
+void leak(int n)
+{
+  int *x = (int *)Malloc(n * sizeof(int));
+  return; /* x is garbage at this point */
+}
+```
+If leak is called frequently, then the heap will gradually fill up with garbage,
+in the worst case consuming the entire virtual address space. **Memory leaks are
+particularly serious for programs such as daemons and servers, which by definition
+never terminate**.
+
+
+
