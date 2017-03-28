@@ -1,0 +1,221 @@
+Title         : LKH research
+Author        : Eddie
+Logo          : True
+
+[TITLE]
+It has been proven that TSP is a member of the set of NP-complete problems.
+This is a class of difficult problems whose time complexity is probably exponential.
+The members of the class are related so that if a polynomial time were
+found for one problem, polynomial time algorithms would exist for all of
+them. However, it is commonly believed that no such polynomial algorithm
+exists. **Therefore, any attempt to construct a general algorithm for finding optimal
+solutions for the TSP in polynomial time must (probably) fail**.
+
+That is, **for any such algorithm it is possible to construct problem instances
+for which the execution time grows at least exponentially with the size of the
+input**. Note, however, that time complexity here refers to any algorithm’s behavior
+**in worst cases**. It can not be excluded that there exist algorithms whose
+average running time is polynomial. The existence of such algorithms is still
+an open question.
+# algorithms to solve the TSP
+## Exact Algorithm
+
+### Cutting-plane or facet-finding algorithm
+  These algorithms are quite complex, with codes on the order
+of 10,000 lines. In addition, the algorithms are very demanding of computer
+power. For example, the exact solution of a symmetric problem with 2392
+cities was determined over a period of more than 27 hours on a powerful super
+computer [7]. It took roughly 3-4 years of CPU time on a large network
+of computers to determine the exact solution of the previously mentioned
+7397-city problem [8].
+
+## Approximate Algorithm(or heuristic) algorithm 
+In contrast, the approximate algorithms obtain good solutions but do not guarantee
+that optimal solutions will be found. **These algorithms are usually very
+simple and have (relative) short running times**. Some of the algorithms give
+solutions that in average differs only by a few percent from the optimal solution.
+Therefore, if a small deviation from optimum can be accepted, it may
+be appropriate to use an approximate algorithm.
+
+The class of approximate algorithms may be subdivided into the following
+three classes:
+
+* **Tour construction algorithms** gradually build a tour by adding a new city at each step.
+ * **nearest neighbor algorithm& its variants:**Start in an arbitrary city. As long as there are cities,
+that have not yet been visited, visit the nearest city that still has not appeared
+in the tour. Finally, return to the first city.  **too greedy is not good!!!**
+
+* **Tour improvement algorithms** improve upon a tour by performing various exchanges.
+ * **K-opt move algorithm(LKH improved on this algorithm)**: hard to implement.
+* **Composite algorithms**. The composite algorithms combine these two
+features.
+
+
+
+### branch and bound
+
+It is a clever way enumerating all the solutions of an integer program to solve it more
+efficiently. The trick is to use the **LP relaxation to bound the optimal integer solutions**
+in a subtree of the enumeration tree, which allows us to eliminate many (in some cases 
+even 99.999999999%) of the enumeration tree. 
+``` javascript
+While there remain active nodes
+   Select an active node j and mark it as inactive
+   Let x(j) and zLP(j) denote the optimal solution and
+   objective of the LP relaxation of Problem(j).
+  Case 1: If z* ≥ zLP(j) then
+  Prune node j
+  Case 2: If z* < zLP(j) and x(j) is feasible for IP then
+  Replace the incumbent by x(j)
+  Prune node j
+  Case 3: If z* < zLP(j) and x(j) is not feasible for IP then
+  Mark the direct descendants of node j as active
+End While 
+```
+
+
+### 
+
+
+# The Lin-Kernighan algorithm
+
+The 2-opt algorithm is a special case of the &lambda;-opt algorithm [15], where in
+each step &lambda; links of the current tour are replaced by &lambda; links in such a way that
+a shorter tour is achieved. In other words, in each step a shorter tour is obtained
+by **deleting &lambda; links and putting the resulting paths together in a new
+way, possibly reversing one ore more of them**.
+
+~ Lemma
+A tour is said to be -optimal (or simply -opt) if it is impossible
+to obtain a shorter tour by replacing any &lambda; of its links by any other
+set of &lambda; links.
+~
+
+However, it is a drawback that &lambda; must be specified in advance. It is difficult
+to know what &lambda; to use to achieve the best compromise between running time
+and quality of solution.
+
+
+Lin and Kernighan removed this drawback by introducing a powerful variable
+&lambda;-opt algorithm. The algorithm changes the value of &lambda; during its execution,
+deciding at each iteration what the value of &lambda; should be. At each iteration step
+the algorithm examines, for ascending values of &lambda;, whether an interchange of
+&lambda; links may result in a shorter tour. Given that the exchange of r links is being
+considered, a series of tests is performed to determine whether r+1 link
+exchanges should be considered. This continues until some stopping
+conditions are satisfied.
+
+
+
+## minimum 1-tree
+**an alternative formulation of the symmetric TSP is: “Find a minimum 1-tree all whose nodes have degree 2”.**
+
+Usually a minimum spanning tree contains many edges in common with an
+optimal tour. An optimal tour normally contains between 70 and 80 percent of
+the edges of a minimum 1-tree. Therefore, minimum 1-trees seem to be well
+suited as a heuristic measure of ‘nearness’.**Edges that belong, or ‘nearly belong',
+to a minimum 1-tree, stand a good chance of also belonging to an optimal
+tour. Conversely, edges that are ‘far from’ belonging to a minimum 1-
+tree have a low probability of also belonging to an optimal tour**. In the Lin-
+Kernighan algorithm these ‘far’ edges may be excluded as candidates to enter
+a tour. It is expected that this exclusion does not cause the optimal tour to be
+missed.
+~ Lemma
+Let T be a minimum 1-tree of length L(T) and let T+(i,j) denote
+a minimum 1-tree required to contain the edge (i,j). Then the
+nearness of an edge (i,j) is defined as the quantity.
+
+
+   &alpha; (i,j) = L(T+(i,j)) - L(T)
+~
+
+The &alpha;-measure can be used to systematically identify those edges that could
+conceivably be included in an optimal tour, and disregard the remainder.
+These 'promising edges', called the candidate set, may, for example, consist
+of the k &alpha;-nearest edges incident to each node, and/or those edges having an
+&alpha;-nearness below a specified upper bound.
+
+In general, using the &alpha;-measure for specifying the candidate set is much better
+than using nearest neighbors. Usually, the candidate set may be smaller,
+without degradation of the solution quality.
+
+
+## improved &alpha;-nearness
+for the 532-city problem the worst case is an optimal edge being the 22nd 
+c-nearest edge for a node, whereas the worst case when using the &alpha;-measure
+is an optimal edge being the 14th a-nearest. The average rank of the optimal
+edges among the candidate edges is reduced from 2.4 to 2.1.
+
+This seems to be quite satisfactory. However, the &alpha;-measure can be improved
+substantially by making a simple transformation of the original cost matrix.
+The transformation is based on the following observations:
+
+* Every tour is a 1-tree. Therefore the length of a minimum 1-tree
+is a lower bound on the length of an optimal tour.
+* If the length of all edges incident to a node are changed with the
+same amount, p, any optimal tour remains optimal. Thus, if the
+cost matrix C= (cij) is transformed to D = (dij), where
+~ Center
+d~ij~=c~ij~+&pi;~i~+&pi;~j~
+~
+**then an optimal tour for the D is also an optimal tour for C**.
+**The length of every tour is increased by 2Spi. The transformation
+leaves the TSP invariant, but usually changes the minimum 1-tree**.
+
+* If T~&pi;~ is a minimum 1-tree with respect to D, then its length, L(T~&pi;~),
+is a lower bound on the length of an optimal tour for D.
+Therefore w(&pi;) = L(T~&pi;~) - 2&sum;&pi;~i~ is lower bound on the length of
+an optimal tour for C.
+
+
+**The aim is now to find a transformation, C&rArr;D, given by the vector
+&pi; = (&pi;~1~,&pi;~2~, ...,&pi;~n~), that _maximizes the lower bound_ w(&pi;) = L(T~&pi;~) -2&sum;&pi;~i~ .**
+
+
+If T~&pi;~ becomes a tour, then the exact optimum has been found. Otherwise, it
+appears, at least intuitively, that if w(&pi;) > w(0), then a-values computed from
+D are better estimates of edges being optimal than &alpha;-values computed from C.
+
+Usually, the maximum of w(&pi;) is close to the length of an optimal tour. Computational
+experience has shown that this maximum typically is less than 1
+percent below optimum. However, finding maximum for w(&pi;) is not a trivial
+task. The function is **piece-wise linear and concave, and therefore not differentiable
+everywhere.**
+
+**A suitable method for maximizing w(&pi;) is subgradient optimization** subgradient 
+is a generalization of the gradient concept). It is an iterative
+method in which the maximum is approximated by stepwise changes of p.
+At each step p is changed in the direction of the subgradient, i.e., p~k+1~ = p~k~ +
+t^k^v^k^, **where v^k^ is a subgradient vector, and t^k^ is a positive scalar, called the
+step size**.
+
+For the actual maximization problem it can be shown that v^k^ = d~k~ - 2 is a subgradient
+vector, where d~k~ is a vector having as its elements the degrees of the
+nodes in the current minimum 1-tree. This subgradient makes the algorithm
+strive towards obtaining minimum 1-trees with node degrees equal to 2, i.e.,
+minimum 1-trees that are tours. Edges incident to a node with degree 1 are
+made shorter. Edges incident to a node with degree greater than 2 are made
+longer. Edges incident to a node with degree 2 are not changed.
+
+
+The &pi-values are often called penalties. The determination of a (good) set of
+penalties is called an ascent.
+
+
+### subgradient algorithm for computing an approximation W for the maximum of w(&pi;).
+
+1. Let k = 0, p0 = 0 and W = -&infin;.
+2. Find a minimum 1-tree, T~&pi;~k
+3. Compute w(&pi;~k) = L(T&pi;k) - 2&sum;&pi;~i~
+4. Let W = max(W, w(&pi;~k~).
+5. Let v^k^ = d^k^ - 2, where d^k^ contains the degrees of nodes in T~&pi;~k.
+6. If v^k = 0 ( T~&pi;~k is an optimal tour), or a stop criterion is satisfied,
+then stop.
+7. Choose a step size, t^k^.
+8. Let &pi;~k+1~ = &pi;~k~ + t^k^v^k^
+9. Let k = k + 1 and go to Step 2.
+
+
+
+
+
