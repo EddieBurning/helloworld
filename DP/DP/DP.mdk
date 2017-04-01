@@ -1,0 +1,129 @@
+Title         : Dynamic Programming
+Author        : Eddie
+Logo          : True
+
+[TITLE]
+[resource from:http://www.geeksforgeeks.org/dynamic-programming-set-1/]
+[resource from:http://www.geeksforgeeks.org/dynamic-programming-set-1/]: http://www.geeksforgeeks.org/dynamic-programming-set-1/
+
+# Overview
+**Dynamic programming is an algorithmic paradigm that solves a given complex problem by breaking it into
+subproblems and _stores the results of subproblems to avoid computing the same results again_**.
+
+To use DP, the problem must satisfy 2 properties:
+
+* **Overlapping Subproblems**(so we can use the results of subproblems)
+* **Optimal Substructure** 
+
+## Overlapping Subproblems
+Like Divide and Conquer, DP combine solutions to subproblems.DP is mainly used **when solutions of 
+subproblems are needed again and again**. In DP,computed solutions to subproblems are stored in a table, so 
+that they don't need to be calculated again.So Dynamic Programming is not useful when there are no 
+common (overlapping) subproblems because there is no point storing the solutions if they are not needed again.
+
+``` javascript
+/* simple recursive program for Fibonacci numbers */
+int fib(int n)
+{
+   if ( n <= 1 )
+      return n;
+   return fib(n-1) + fib(n-2);
+}
+```
+
+**But how to save the results of subproblems?** Generally there are two ways.
+### 2 ways to store subproblems results
+*  **Memoization(Top Down)**
+The memoized program for a problem is similar to the recursive version with a small modification that
+ it looks into a lookup table before computing solutions. We initialize a lookup array with all initial
+  values as NIL. Whenever we need solution to a subproblem, we first look into the lookup table. 
+  If the precomputed value is there then we return that value, otherwise we calculate the value 
+  and put the result in lookup table so that it can be reused later.
+  
+``` javascript
+/* C/C++ program for Memoized version for nth Fibonacci number */
+#include<stdio.h>
+#define NIL -1
+#define MAX 100
+ 
+int lookup[MAX];
+ 
+/* Function to initialize NIL values in lookup table */
+void _initialize()
+{
+  int i;
+  for (i = 0; i < MAX; i++)
+    lookup[i] = NIL;
+}
+ 
+/* function for nth Fibonacci number */
+int fib(int n)
+{
+   if (lookup[n] == NIL)
+   {
+      if (n <= 1)
+         lookup[n] = n;
+      else
+         lookup[n] = fib(n-1) + fib(n-2);
+   }
+ 
+   return lookup[n];
+}
+ 
+int main ()
+{
+  int n = 40;
+  _initialize();
+  printf("Fibonacci number is %d ", fib(n));
+  return 0;
+}
+```
+
+
+* **Tabulation (Bottom Up)**
+The tabulated program for a given problem builds a table in bottom up 
+fashion and returns the last entry from table. For example, for the same
+ Fibonacci number, we first calculate fib(0) then fib(1) then fib(2) 
+ then fib(3) and so on. So literally, we are building the solutions 
+ of subproblems bottom-up.
+Following is the tabulated version for nth Fibonacci Number.
+``` javascript
+/* C program for Tabulated version */
+#include<stdio.h>
+int fib(int n)
+{
+  int f[n+1];
+  int i;
+  f[0] = 0;   f[1] = 1; 
+  for (i = 2; i <= n; i++)
+      f[i] = f[i-1] + f[i-2];
+ 
+  return f[n];
+}
+  
+int main ()
+{
+  int n = 9;
+  printf("Fibonacci number is %d ", fib(n));
+  return 0;
+}
+```
+* **compare**.
+Both Tabulated and Memoized store the solutions of subproblems. In Memoized version, 
+**table is filled on demand while in Tabulated version, starting from the first entry, 
+all entries are filled one by one**. Unlike the Tabulated version, all entries 
+of the lookup table are not necessarily filled in Memoized version. For example, 
+Memoized solution of the LCS problem doesn’t necessarily fill all entries.
+
+
+
+## Optimal Substructure
+A given problem has Optimal Substructure Property **if optimal solution of the given problem can be
+obtained by using optiaml solutions of its subproblems.**
+
+For example, the Shortest Path problem has following optimal substructure property:
+If a node x lies in the shortest path from a source node u to destination node v then the shortest 
+path from u to v is combination of shortest path from u to x and shortest path from x to v. 
+The standard All Pair Shortest Path algorithms like Floyd–Warshall and Bellman–Ford are typical 
+examples of Dynamic Programming.
+
