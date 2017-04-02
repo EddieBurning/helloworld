@@ -1,0 +1,98 @@
+Title         : Something you should know about C++
+Author        : Eddie
+Logo          : True
+
+[TITLE]
+
+# virtual function
+  **virtual functions are called according to the type of object pointed or referred, not according to
+the type of pointer or reference. In other words, virtual functions are resolved late, at runtime.**
+
+## How does compiler do this magic of late resolution?
+Compiler maintains two things to this magic:
+
+  * **vtable: A table of function pointers. It is maintained per class.**
+  * **vptr: A pointer to vtable. It is maintained per object (See this for an example).**
+
+Compiler adds additional code at two places to maintain and use vptr.
+
+1. Code in every constructor. This code sets vptr of the object being created. This code sets vptr to point
+ to vtable of the class.
+2. Code with polymorphic function call (e.g. bp->show() in above code). Wherever a polymorphic call is made, 
+compiler inserts code to first look for vptr using base class pointer or reference (In the above example,
+ since pointed or referred object is of derived type, vptr of derived class is accessed). 
+ Once vptr is fetched, vtable of derived class can be accessed. Using vtable, address of derived
+  class function show() is accessed and called.
+  
+![virtualFuns1]
+
+[virtualFuns1]: images/virtualFuns1.png "virtualFuns1" { width:auto; max-width:90% }
+
+## Pure virtual functions (when we set = 0) can also have a function body.What is the use to provide a function body for pure virtual functions, if they are not going get called at all?
+
+Your assumption that pure virtual function cannot be called is absolutely incorrect. 
+When a function is declared pure virtual, it simply means that this function 
+cannot get called dynamically, through a virtual dispatch mechanism. 
+Yet, this very same function can easily be called statically, without virtual dispatch.
+
+In C++ language static call to a virtual function is performed when a qualified 
+name of the function is used in the call, i.e. when the function name specified in the 
+call has the \<class name>::<function name> form.
+
+
+## Default arguments do not participate in signature of functions.
+ Also, **the default value is used at compile time**. When compiler sees that
+  an argument is missing in a function call, it substitutes the default 
+  value given. Therefore, in the above program, value of x is substituted 
+  at compile time, and at run time derived class’s fun() is called.
+
+
+## In fact except inline, no other keyword is allowed in the declaration of constructor.
+
+What is Polymorphism? How is it supported by C++?
+Polymorphism means that some code or operations or objects behave differently in different contexts. In C++,  following features support polymorphism.
+Compile Time Polymorphism: Compile time polymorphism means compiler knows which function should be called when a polymorphic call is made.  C++ supports compiler time polymorphism by supporting features like templates, function overloading and default arguments.
+Run Time Polymorphism: Run time polymorphism is supported by virtual functions. The idea is, virtual functions are called according to the type of object pointed or referred, not according to the type of pointer or reference. In other words, virtual functions are resolved late, at runtime.
+
+
+## Character literals are treated differently in C and C++. In C character literals like ‘a’, ‘b’, ..etc are treated as integers, while as characters in C++. (See this for details)
+## In C, we need to use struct tag whenever we declare a struct variable. In C++, the struct tag is not necessary. For example, let there be a structure for Student. In C, we must use ‘struct Student‘ for Student variables. In C++, we can omit struct and use ‘Student‘ only.
+Following is a program that is based on the fact and produces different outputs in C and C++. It prints sizeof(int) in C and sizeof(struct T) in C++.
+
+## Types of boolean results are different in C and C++. Thanks to Gaurav Jain for suggesting this point
+
+``` javascript
+// output = 4 in C (which is size of int)
+printf("%d", sizeof(1==1)); 
+ 
+// output = 1 in c++ (which is the size of boolean datatype)
+cout << sizeof(1==1); 
+```
+
+
+## What are the differences between C and C++?
+1) C++ is a kind of superset of C, most of C programs except few exceptions (See this and this) work in C++ as well.
+2) C is a procedural programming language, but C++ supports both procedural and Object Oriented programming.
+3) Since C++ supports object oriented programming, it supports features like function overloading, templates, inheritance, virtual functions, friend functions. These features are absent in C.
+4) C++ supports **exception handling at language level**, in C exception handling is done in **traditional if-else style**.
+5) C++ supports references, C doesn’t.
+6) In C, scanf() and printf() are mainly used input/output. C++ mainly uses streams to perform input and output operations. cin is standard input stream and cout is standard output stream.
+There are many more differences, above is a list of main differences.
+
+## What are the differences between references and pointers?
+Both references and pointers can be used to change local variables of one function inside another function. Both of them can also be used to save copying of big objects when passed as arguments to functions or returned from functions, to get efficiency gain.
+Despite above similarities, there are following differences between references and pointers.
+References are less powerful than pointers
+
+1) Once a reference is created, it cannot be later made to reference another object; it cannot be reseated. This is often done with pointers.
+2) References cannot be NULL. Pointers are often made NULL to indicate that they are not pointing to any valid thing.
+3) A reference must be initialized when declared. There is no such restriction with pointers
+Due to the above limitations, references in C++ cannot be used for implementing data structures like Linked List, Tree, etc. In Java, references don’t have above restrictions, and can be used to implement all data structures. References being more powerful in Java, is the main reason Java doesn’t need pointers.
+References are safer and easier to use:
+
+1) Safer: Since references must be initialized, wild references like wild pointers are unlikely to exist. It is still possible to have references that don’t refer to a valid location (See questions 5 and 6 in the below exercise )
+2) Easier to use: References don’t need dereferencing operator to access the value. They can be used like normal variables. ‘&’ operator is needed only at the time of declaration. Also, members of an object reference can be accessed with dot operator (‘.’), unlike pointers where arrow operator (->) is needed to access members.
+
+## In C++, there is no overloading across scopes – derived class scopes are not an exception to this general rule. (See this for more examples)
+
+## 
